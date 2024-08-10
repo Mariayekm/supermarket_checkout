@@ -18,10 +18,19 @@ var _ ICheckout = myCheckout{}
 
 // Create a checkout instance
 func NewCheckout() myCheckout {
-	return myCheckout{}
+	newCheckout := myCheckout{}
+	emptyProducts := make(map[string]int)
+	newCheckout.scannedProducts = emptyProducts
+	return newCheckout
 }
 
 func (c myCheckout) Scan(SKU string) (err error) {
+	if _, ok := c.scannedProducts[SKU]; !ok {
+		c.scannedProducts[SKU] = 1
+	} else {
+		c.scannedProducts[SKU] += 1
+	}
+	fmt.Println("scanned product")
 	return err
 }
 
@@ -34,4 +43,7 @@ func main() {
 	newCheckout := NewCheckout()
 	total, _ := newCheckout.GetTotalPrice()
 	fmt.Println("here is total ", total)
+	newCheckout.Scan("A")
+	newCheckout.Scan("A")
+
 }
