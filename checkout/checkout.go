@@ -14,14 +14,14 @@ type ICheckout interface {
 
 type myCheckout struct {
 	scannedProducts map[string]int
-	prices          []SKU
+	skus            map[string]SKU
 }
 
 type SKU struct {
 	sKUname         string
 	normalPrice     int
-	specialQuantity int
-	specialPrice    float32
+	specialQuantity *int     // TODO make optional
+	specialPrice    *float64 // TODO make optional
 }
 
 // Make sure myCheckout implements ICheckout
@@ -30,8 +30,12 @@ var _ ICheckout = myCheckout{}
 // Create a checkout instance
 func NewCheckout() myCheckout {
 	newCheckout := myCheckout{}
+
 	emptyProducts := make(map[string]int)
 	newCheckout.scannedProducts = emptyProducts
+
+	emptyInventory := make(map[string]SKU)
+	newCheckout.skus = emptyInventory
 	return newCheckout
 }
 
@@ -48,52 +52,58 @@ func (c myCheckout) Scan(sKU string) (err error) {
 
 // GetTotalPrice returns the total cost of all the scanned products
 func (c myCheckout) GetTotalPrice() (totalPrice int, err error) {
-	for _, k := range c.scannedProducts {
-		totalPrice += k
+	for sku, _ := range c.scannedProducts {
+		totalPrice += c.skus[sku].normalPrice
 	}
 	return totalPrice, err
 }
 
 // GetTotalPrice returns the total cost of all the scanned products
-func (c myCheckout) registerSKU(name string, price int, offer string) (err error) {
+func (c myCheckout) registerSKU(name string, price int, offer *string) (err error) {
 	newSKU := SKU{
 		sKUname:     name,
 		normalPrice: price,
 	}
-	if !strings.Contains(offer, "for") {
-		err = fmt.Errorf("invalid offer")
-		return err
-	} else {
-		tempStr := strings.ReplaceAll(offer, " ", "")
-		processedOffer := strings.Split(tempStr, "for")
-		if len(processedOffer) != 2 {
-			err = fmt.Errorf("invalid offer")
-			return err
-		}
-		if quantity, err := strconv.Atoi(processedOffer[0]); err != nil {
+	if offer != nil {
+		if !strings.Contains(*offer, "for") {
 			err = fmt.Errorf("invalid offer")
 			return err
 		} else {
-			newSKU.specialQuantity = quantity
-		}
-		if offerPrice, err := strconv.ParseFloat(processedOffer[1], 32); err != nil {
-			err = fmt.Errorf("invalid offer")
-			return err
-		} else {
-			newSKU.specialPrice = float32(offerPrice)
+			tempStr := strings.ReplaceAll(*offer, " ", "")
+			processedOffer := strings.Split(tempStr, "for")
+			if len(processedOffer) != 2 {
+				err = fmt.Errorf("invalid offer")
+				return err
+			}
+			if quantity, err := strconv.Atoi(processedOffer[0]); err != nil {
+				err = fmt.Errorf("invalid offer")
+				return err
+			} else {
+				newSKU.specialQuantity = &quantity
+			}
+			if offerPrice, err := strconv.ParseFloat(processedOffer[1], 32); err != nil {
+				err = fmt.Errorf("invalid offer")
+				return err
+			} else {
+				newSKU.specialPrice = &offerPrice
+			}
 		}
 	}
-	fmt.Println("new sku: ", newSKU)
+
+	c.skus[name] = newSKU
+	// fmt.Println("new sku: ", c.skus)
 	return err
 }
 
 func main() {
 	fmt.Println("Running checkout program")
 	newCheckout := NewCheckout()
+	deal1 := "3 for 2"
+	newCheckout.registerSKU("A", 10, &deal1)
+	newCheckout.registerSKU("B", 25, nil)
 	newCheckout.Scan("A")
 	newCheckout.Scan("A")
 	newCheckout.Scan("B")
 	total, _ := newCheckout.GetTotalPrice()
 	fmt.Println("here is total ", total)
-	newCheckout.registerSKU("A", 10, "3 for 2")
 }
