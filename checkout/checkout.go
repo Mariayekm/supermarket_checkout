@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type ICheckout interface {
 	Scan(SKU string) (err error)
@@ -10,6 +14,14 @@ type ICheckout interface {
 
 type myCheckout struct {
 	scannedProducts map[string]int
+	prices          []SKU
+}
+
+type SKU struct {
+	sKUname         string
+	normalPrice     int
+	specialQuantity int
+	specialPrice    float32
 }
 
 // Make sure myCheckout implements ICheckout
@@ -42,6 +54,39 @@ func (c myCheckout) GetTotalPrice() (totalPrice int, err error) {
 	return totalPrice, err
 }
 
+// GetTotalPrice returns the total cost of all the scanned products
+func (c myCheckout) registerSKU(name string, price int, offer string) (err error) {
+	newSKU := SKU{
+		sKUname:     name,
+		normalPrice: price,
+	}
+	if !strings.Contains(offer, "for") {
+		err = fmt.Errorf("invalid offer")
+		return err
+	} else {
+		tempStr := strings.ReplaceAll(offer, " ", "")
+		processedOffer := strings.Split(tempStr, "for")
+		if len(processedOffer) != 2 {
+			err = fmt.Errorf("invalid offer")
+			return err
+		}
+		if quantity, err := strconv.Atoi(processedOffer[0]); err != nil {
+			err = fmt.Errorf("invalid offer")
+			return err
+		} else {
+			newSKU.specialQuantity = quantity
+		}
+		if offerPrice, err := strconv.ParseFloat(processedOffer[1], 32); err != nil {
+			err = fmt.Errorf("invalid offer")
+			return err
+		} else {
+			newSKU.specialPrice = float32(offerPrice)
+		}
+	}
+	fmt.Println("new sku: ", newSKU)
+	return err
+}
+
 func main() {
 	fmt.Println("Running checkout program")
 	newCheckout := NewCheckout()
@@ -50,5 +95,5 @@ func main() {
 	newCheckout.Scan("B")
 	total, _ := newCheckout.GetTotalPrice()
 	fmt.Println("here is total ", total)
-
+	newCheckout.registerSKU("A", 10, "3 for 2")
 }
