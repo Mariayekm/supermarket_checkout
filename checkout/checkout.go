@@ -41,6 +41,7 @@ func NewCheckout() myCheckout {
 
 // Scan updates the number of products that have been scanned
 func (c myCheckout) Scan(sKU string) (err error) {
+	// check sku is in inventory?
 	if _, ok := c.scannedProducts[sKU]; !ok {
 		c.scannedProducts[sKU] = 1
 	} else {
@@ -52,11 +53,21 @@ func (c myCheckout) Scan(sKU string) (err error) {
 
 // GetTotalPrice returns the total cost of all the scanned products
 func (c myCheckout) GetTotalPrice() (totalPrice int, err error) {
-	for sku, _ := range c.scannedProducts {
-		totalPrice += c.skus[sku].normalPrice
+	for productName, productQuantity := range c.scannedProducts {
+		sKU := c.skus[productName]
+		if sKU.specialQuantity == nil {
+			totalPrice += (sKU.normalPrice * productQuantity)
+		} else {
+			discountedItems := productQuantity / (*sKU.specialQuantity)
+			fullPriceItems := productQuantity % (*sKU.specialQuantity)
+			totalPrice += ((int(*sKU.specialPrice) * discountedItems) + (sKU.normalPrice * fullPriceItems))
+		}
 	}
 	return totalPrice, err
 }
+
+//func update price
+// func update offers
 
 // GetTotalPrice returns the total cost of all the scanned products
 func (c myCheckout) registerSKU(name string, price int, offer *string) (err error) {
@@ -101,6 +112,7 @@ func main() {
 	deal1 := "3 for 2"
 	newCheckout.registerSKU("A", 10, &deal1)
 	newCheckout.registerSKU("B", 25, nil)
+	newCheckout.Scan("A")
 	newCheckout.Scan("A")
 	newCheckout.Scan("A")
 	newCheckout.Scan("B")
