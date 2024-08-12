@@ -11,35 +11,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ICheckout interface {
-	Scan(SKU string) (err error)
+func (s *shopConf) loadShopConf() *shopConf {
 
-	GetTotalPrice() (totalPrice int, err error)
+	yamlFile, err := os.ReadFile("conf.yaml")
+	if err != nil {
+		log.Fatalf("failed to read config file: %v ", err)
+	}
+	err = yaml.Unmarshal(yamlFile, s)
+	if err != nil {
+		log.Fatalf("Unmarshal: %v", err)
+	}
+
+	return s
 }
 
-type myCheckout struct {
-	scannedProducts map[string]int
-	skus            map[string]SKU
-}
-
-type SKU struct {
-	unitPrice       int
-	specialQuantity *int
-	specialPrice    *int
-}
-
-type shopConf struct {
-	Items []struct {
-		SKUName      string  `yaml:"SKU"`
-		UnitPrice    int     `yaml:"unitPrice"`
-		SpecialPrice *string `yaml:"specialPrice"`
-	} `yaml:"items"`
-}
-
-// Make sure myCheckout implements ICheckout
-var _ ICheckout = myCheckout{}
-
-// Create a checkout instance
+// Create a checkout instance based on the config file
 func NewCheckout(s shopConf) (myCheckout, error) {
 	newCheckout := myCheckout{}
 
@@ -92,20 +78,6 @@ func (c myCheckout) GetTotalPrice() (totalPrice int, err error) {
 	return totalPrice, err
 }
 
-func (s *shopConf) loadShopConf() *shopConf {
-
-	yamlFile, err := os.ReadFile("conf.yaml")
-	if err != nil {
-		log.Printf("yamlFile.Get err   #%v ", err)
-	}
-	err = yaml.Unmarshal(yamlFile, s)
-	if err != nil {
-		log.Fatalf("Unmarshal: %v", err)
-	}
-
-	return s
-}
-
 // registerSKU adds a new SKU to the checkout.
 // The offer parameter is expected in the format "x for y"
 // otherwise an error is returned.
@@ -140,7 +112,6 @@ func (c myCheckout) registerSKU(name string, price int, offer *string) (err erro
 	}
 
 	c.skus[name] = newSKU
-	// fmt.Println("new sku: ", c.skus)
 	return err
 }
 
@@ -150,8 +121,8 @@ func main() {
 	shop.loadShopConf()
 	newCheckout, err := NewCheckout(shop)
 	if err != nil {
-		err = fmt.Errorf("failed to create new checkout")
-		panic(err)
+		err = fmt.Errorf("failed to create new checkout: %v", err)
+		log.Fatalf(err.Error())
 	}
 
 	fmt.Println("Start scanning products")
