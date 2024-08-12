@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type ICheckout interface {
@@ -18,17 +22,24 @@ type myCheckout struct {
 }
 
 type SKU struct {
-	sKUname         string
-	normalPrice     int
-	specialQuantity *int     // TODO make optional
-	specialPrice    *float64 // TODO make optional
+	unitPrice       int
+	specialQuantity *int
+	specialPrice    *int
+}
+
+type shopConf struct {
+	Items []struct {
+		SKUName      string  `yaml:"SKU"`
+		UnitPrice    int     `yaml:"unitPrice"`
+		SpecialPrice *string `yaml:"specialPrice"`
+	} `yaml:"items"`
 }
 
 // Make sure myCheckout implements ICheckout
 var _ ICheckout = myCheckout{}
 
 // Create a checkout instance
-func NewCheckout() myCheckout {
+func NewCheckout(s shopConf) (myCheckout, error) {
 	newCheckout := myCheckout{}
 
 	emptyProducts := make(map[string]int)
@@ -36,16 +47,22 @@ func NewCheckout() myCheckout {
 
 	emptyInventory := make(map[string]SKU)
 	newCheckout.skus = emptyInventory
-	return newCheckout
+
+	for _, item := range s.Items {
+		if err := newCheckout.registerSKU(item.SKUName, item.UnitPrice, item.SpecialPrice); err != nil {
+			return newCheckout, err
+		}
+	}
+	return newCheckout, nil
 }
 
 // Scan updates the number of products that have been scanned
-func (c myCheckout) Scan(sKU string) (err error) {
+func (c myCheckout) Scan(SKU string) (err error) {
 	// check sku is in inventory?
-	if _, ok := c.scannedProducts[sKU]; !ok {
-		c.scannedProducts[sKU] = 1
+	if _, ok := c.scannedProducts[SKU]; !ok {
+		c.scannedProducts[SKU] = 1
 	} else {
-		c.scannedProducts[sKU] += 1
+		c.scannedProducts[SKU] += 1
 	}
 	fmt.Println("scanned product")
 	return err
@@ -56,24 +73,36 @@ func (c myCheckout) GetTotalPrice() (totalPrice int, err error) {
 	for productName, productQuantity := range c.scannedProducts {
 		sKU := c.skus[productName]
 		if sKU.specialQuantity == nil {
-			totalPrice += (sKU.normalPrice * productQuantity)
+			totalPrice += (sKU.unitPrice * productQuantity)
 		} else {
 			discountedItems := productQuantity / (*sKU.specialQuantity)
 			fullPriceItems := productQuantity % (*sKU.specialQuantity)
-			totalPrice += ((int(*sKU.specialPrice) * discountedItems) + (sKU.normalPrice * fullPriceItems))
+			totalPrice += ((int(*sKU.specialPrice) * discountedItems) + (sKU.unitPrice * fullPriceItems))
 		}
 	}
 	return totalPrice, err
 }
 
-//func update price
-// func update offers
+func (s *shopConf) loadShopConf() *shopConf {
 
-// GetTotalPrice returns the total cost of all the scanned products
+	yamlFile, err := os.ReadFile("conf.yaml")
+	if err != nil {
+		log.Printf("yamlFile.Get err   #%v ", err)
+	}
+	err = yaml.Unmarshal(yamlFile, s)
+	if err != nil {
+		log.Fatalf("Unmarshal: %v", err)
+	}
+
+	return s
+}
+
+// registerSKU adds a new SKU to the checkout.
+// The offer parameter is expected in the format "x for y"
+// otherwise an error is returned.
 func (c myCheckout) registerSKU(name string, price int, offer *string) (err error) {
 	newSKU := SKU{
-		sKUname:     name,
-		normalPrice: price,
+		unitPrice: price,
 	}
 	if offer != nil {
 		if !strings.Contains(*offer, "for") {
@@ -92,7 +121,7 @@ func (c myCheckout) registerSKU(name string, price int, offer *string) (err erro
 			} else {
 				newSKU.specialQuantity = &quantity
 			}
-			if offerPrice, err := strconv.ParseFloat(processedOffer[1], 32); err != nil {
+			if offerPrice, err := strconv.Atoi(processedOffer[1]); err != nil {
 				err = fmt.Errorf("invalid offer")
 				return err
 			} else {
@@ -108,10 +137,13 @@ func (c myCheckout) registerSKU(name string, price int, offer *string) (err erro
 
 func main() {
 	fmt.Println("Running checkout program")
-	newCheckout := NewCheckout()
-	deal1 := "3 for 2"
-	newCheckout.registerSKU("A", 10, &deal1)
-	newCheckout.registerSKU("B", 25, nil)
+	var shop shopConf
+	shop.loadShopConf()
+	newCheckout, err := NewCheckout(shop)
+	if err != nil {
+		err = fmt.Errorf("failed to create new checkout")
+		panic(err)
+	}
 	newCheckout.Scan("A")
 	newCheckout.Scan("A")
 	newCheckout.Scan("A")

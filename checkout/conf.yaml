@@ -1,0 +1,11 @@
+items:
+- SKU: "A"
+  unitPrice: 50
+  specialPrice: "3 for 130"
+- SKU: "B"
+  unitPrice: 30
+  specialPrice: "2 for 45"
+- SKU: "C"
+  unitPrice: 20
+- SKU: "D"
+  unitPrice: 15
