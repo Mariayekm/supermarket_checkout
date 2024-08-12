@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -59,17 +60,25 @@ func NewCheckout(s shopConf) (myCheckout, error) {
 // Scan updates the number of products that have been scanned
 func (c myCheckout) Scan(SKU string) (err error) {
 	// check sku is in inventory?
+	if _, ok := c.skus[SKU]; !ok {
+		err = fmt.Errorf("product does not exit")
+		return err
+	}
 	if _, ok := c.scannedProducts[SKU]; !ok {
 		c.scannedProducts[SKU] = 1
 	} else {
 		c.scannedProducts[SKU] += 1
 	}
-	fmt.Println("scanned product")
+	fmt.Println("Scanned product: ", SKU)
 	return err
 }
 
 // GetTotalPrice returns the total cost of all the scanned products
 func (c myCheckout) GetTotalPrice() (totalPrice int, err error) {
+	if len(c.scannedProducts) < 1 {
+		err = fmt.Errorf("cannot get total price: no products were scanned")
+		return totalPrice, err
+	}
 	for productName, productQuantity := range c.scannedProducts {
 		sKU := c.skus[productName]
 		if sKU.specialQuantity == nil {
@@ -144,10 +153,20 @@ func main() {
 		err = fmt.Errorf("failed to create new checkout")
 		panic(err)
 	}
-	newCheckout.Scan("A")
-	newCheckout.Scan("A")
-	newCheckout.Scan("A")
-	newCheckout.Scan("B")
-	total, _ := newCheckout.GetTotalPrice()
-	fmt.Println("here is total ", total)
+
+	fmt.Println("Start scanning products")
+	reader := bufio.NewReader(os.Stdin)
+	scannedInput, err := reader.ReadString('\n')
+	processedInput := strings.ReplaceAll(scannedInput, " ", "")
+	for _, product := range processedInput {
+		if product == '\n' {
+			break
+		}
+		newCheckout.Scan(string(product))
+	}
+	if total, err := newCheckout.GetTotalPrice(); err != nil {
+		log.Fatalf(err.Error())
+	} else {
+		fmt.Printf("Total cost is %dp\n", total)
+	}
 }
